@@ -1,3 +1,6 @@
+import argparse
+from datetime import datetime
+
 from sub_units.bayes_model_implementations.moving_window_model import \
     MovingWindowModel  # want to make an instance of this class for each state / set of params
 from sub_units.utils import run_everything as run_everything_imported  # for plotting the report across all states
@@ -10,14 +13,17 @@ import sub_units.load_data as load_data  # only want to load this once, so impor
 n_bootstraps = 100
 n_likelihood_samples = 100000
 moving_window_size = 21  # three weeks
-max_date_str = '2020-05-13'
+default_max_date_str = '2020-05-13'
 opt_calc = True
 opt_force_plot = False
 opt_simplified = False # set to True to just do statsmodels as a simplified daily service
 override_run_states = None #['total', 'Virginia', 'Arkansas', 'Connecticut', 'Alaska', 'South Dakota', 'Hawaii', 'Vermont', 'Wyoming'] # None
 
-state_models_filename = f'state_models_smoothed_moving_window_{n_bootstraps}_bootstraps_{n_likelihood_samples}_likelihood_samples_{max_date_str.replace("-", "_")}_max_date.joblib'
-state_report_filename = f'state_report_smoothed_moving_window_{n_bootstraps}_bootstraps_{n_likelihood_samples}_likelihood_samples_{max_date_str.replace("-", "_")}_max_date.joblib'
+def get_state_models_filename(max_date_string):
+    return f'state_models_smoothed_moving_window_{n_bootstraps}_bootstraps_{n_likelihood_samples}_likelihood_samples_{max_date_string.replace("-", "_")}_max_date.joblib'
+
+def get_state_report_filename(max_date_string):
+    return f'state_report_smoothed_moving_window_{n_bootstraps}_bootstraps_{n_likelihood_samples}_likelihood_samples_{max_date_string.replace("-", "_")}_max_date.joblib'
 
 # fixing parameters I don't want to train for saves a lot of computer power
 extra_params = dict()
@@ -129,13 +135,13 @@ run_states = population_ranked_state_names
 if override_run_states is not None:
     run_states = override_run_states
 
-def run_everything():
+def run_everything(max_date_str=default_max_date_str):
     return run_everything_imported(run_states,
                                    MovingWindowModel,
                                    max_date_str,
                                    load_data,
-                                   state_models_filename=state_models_filename,
-                                   state_report_filename=state_report_filename,
+                                   state_models_filename=get_state_models_filename(max_date_str),
+                                   state_report_filename=get_state_report_filename(max_date_str),
                                    moving_window_size=moving_window_size,
                                    n_bootstraps=n_bootstraps,
                                    n_likelihood_samples=n_likelihood_samples,
@@ -155,6 +161,21 @@ def run_everything():
                                    opt_simplified=opt_simplified
                                    )
 
+def valid_date(date):
+    try:
+        # call strptime to ensure valid date format then return as string
+        datetime.strptime(date, '%Y-%m-%d')
+        return date
+    except ValueError:
+        raise argparse.ArgumentError(f'Invalid date provided {date}')
 
 if __name__ == '__main__':
-    run_everything()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--max_date_string',
+                        '-mds',
+                        type=valid_date,
+                        required=True,
+                        help='Latest date for which there is covid data in the format YYYY-MM-DD')
+    args = parser.parse_args()
+
+    run_everything(args.max_date_string)
